@@ -11,7 +11,7 @@ from poetry.console.commands.command import Command
 
 if TYPE_CHECKING:
     from pathlib import Path
-
+    from poetry.console.commands.option import Option
     from cleo.io.inputs.option import Option
 
 
@@ -26,15 +26,45 @@ class CheckCommand(Command):
         option(
             "lock",
             None,
-            "Checks that <comment>poetry.lock</> exists for the current"
-            " version of <comment>pyproject.toml</>.",
+            "Checks that <comment>poetry.lock</> exists for the current version of"
+            " <comment>pyproject.toml</>.",
         ),
         option(
             "strict",
             None,
             "Fail if check reports warnings.",
         ),
+        option(
+            "all-errors",
+            None,
+            "Report all errors instead of stopping at the first one.",
+        ),
     ]
+
+    def handle(self) -> int:
+        from poetry.factory import Factory
+
+        check_result = Factory.check(
+            self.poetry, self.option("lock"), self.option("strict")
+        )
+
+        if not check_result["errors"] and not check_result["warnings"]:
+            self.line("<info>All set!</info>")
+            return 0
+
+        if self.option("all-errors"):
+            self.line("<error>pyproject.toml is invalid:</error>")
+            for error in check_result["errors"]:
+                self.line(f"  - {error}")
+            for warning in check_result["warnings"]:
+                self.line(f"<fg=yellow>Warning: {warning}</fg=yellow>")
+        else:
+            if check_result["errors"]:
+                self.line(f"<error>Error: {check_result['errors'][0]}</error>")
+            elif check_result["warnings"]:
+                self.line(f"<fg=yellow>Warning: {check_result['warnings'][0]}</fg=yellow>")
+
+        return 1
 
     def _validate_classifiers(
         self, project_classifiers: set[str]
